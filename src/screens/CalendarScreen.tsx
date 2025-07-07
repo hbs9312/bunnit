@@ -1,9 +1,10 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Calendar } from "../components/Calendar";
 
 export default function CalendarScreen() {
 	return (
-		<View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-			<Text>Calendar</Text>
+		<View style={{ flex: 1 }}>
+			<Calendar />
 		</View>
 	);
 }
