@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
 	Dimensions,
 	FlatList,
@@ -57,9 +57,19 @@ const rednerItem = ({
 	);
 };
 
-export const Calendar = () => {
-	const [selectedMonth, setSelectedMonth] = useState<dayjs.Dayjs>(dayjs());
-	const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs>(selectedMonth);
+export const Calendar = ({
+	initialDate,
+	onChange,
+}: {
+	initialDate: Date;
+	onChange?: (date: Date) => void;
+}) => {
+	const [selectedMonth, setSelectedMonth] = useState<dayjs.Dayjs>(
+		dayjs(initialDate),
+	);
+	const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs>(
+		dayjs(selectedMonth),
+	);
 
 	const columns = useMemo(() => {
 		const startOfMonth = selectedMonth.startOf("month");
@@ -90,6 +100,10 @@ export const Calendar = () => {
 	const handleNextMonth = () => {
 		setSelectedMonth(dayjs(selectedMonth).add(1, "month"));
 	};
+
+	useEffect(() => {
+		onChange?.(selectedDate.toDate());
+	}, [selectedDate, onChange]);
 
 	return (
 		<View style={{ flex: 1 }}>

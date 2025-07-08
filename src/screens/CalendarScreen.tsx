@@ -4,7 +4,10 @@ import { Calendar } from "../components/Calendar";
 export default function CalendarScreen() {
 	return (
 		<View style={{ flex: 1 }}>
-			<Calendar />
+			<Calendar
+				initialDate={new Date()}
+				onChange={(date) => console.log(date)}
+			/>
 		</View>
 	);
 }
