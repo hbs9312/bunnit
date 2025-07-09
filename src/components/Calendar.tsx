@@ -1,61 +1,23 @@
 import dayjs from "dayjs";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	Dimensions,
-	FlatList,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
 	View,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+	runOnJS,
+	useAnimatedStyle,
+	useSharedValue,
+	withTiming,
+} from "react-native-reanimated";
 import Icon from "react-native-vector-icons/AntDesign";
+import { CalendarBody } from "./CalendarBody";
 
 const deviceWidth = Dimensions.get("window").width;
-
-const rednerItem = ({
-	item,
-	isCurrentMonth,
-	isSelected,
-	onPress,
-}: {
-	item: dayjs.Dayjs | null;
-	isCurrentMonth: boolean;
-	isSelected: boolean;
-	onPress: () => void;
-}) => {
-	const textColor = isCurrentMonth ? "black" : "lightgray";
-	return (
-		<TouchableOpacity
-			style={{
-				width: deviceWidth / 7,
-				height: deviceWidth / 7,
-				justifyContent: "center",
-				alignItems: "center",
-			}}
-			onPress={onPress}
-		>
-			<View
-				style={{
-					width: 30,
-					height: 30,
-					justifyContent: "center",
-					alignItems: "center",
-					borderRadius: 15,
-					borderWidth: 1,
-					borderColor: isSelected ? "blue" : "transparent",
-				}}
-			>
-				<Text
-					style={{
-						color: isCurrentMonth ? textColor : "lightgray",
-					}}
-				>
-					{item?.format("D")}
-				</Text>
-			</View>
-		</TouchableOpacity>
-	);
-};
 
 export const Calendar = ({
 	initialDate,
@@ -64,41 +26,81 @@ export const Calendar = ({
 	initialDate: Date;
 	onChange?: (date: Date) => void;
 }) => {
-	const [selectedMonth, setSelectedMonth] = useState<dayjs.Dayjs>(
+	const translateX = useSharedValue(-deviceWidth);
+	const height = useSharedValue<number | null>(null);
+	const [mode, setMode] = useState<"month" | "week">("month");
+	const [displayMonth, setDisplayMonth] = useState<dayjs.Dayjs>(
 		dayjs(initialDate),
 	);
 	const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs>(
-		dayjs(selectedMonth),
+		dayjs(displayMonth),
 	);
 
-	const columns = useMemo(() => {
-		const startOfMonth = selectedMonth.startOf("month");
-		const endOfMonth = selectedMonth.endOf("month");
+	const subtractMonth = () => {
+		setDisplayMonth(dayjs(displayMonth).subtract(1, "month"));
+		translateX.value = -deviceWidth;
+	};
 
-		const columns: (dayjs.Dayjs | null)[] = [];
+	const addMonth = () => {
+		setDisplayMonth(dayjs(displayMonth).add(1, "month"));
+		translateX.value = -deviceWidth;
+	};
+	const horizontalPanGesture = Gesture.Pan()
+		.activeOffsetX([-50, 50])
+		.onUpdate((event) => {
+			translateX.value = event.translationX - deviceWidth;
+		})
+		.onEnd((event) => {
+			if (event.translationX > deviceWidth * 0.3) {
+				translateX.value = withTiming(0, { duration: 300 }, (isFinished) => {
+					if (isFinished) {
+						// runOnJS(subtractMonth)();
+					}
+				});
+			} else if (event.translationX < -deviceWidth * 0.3) {
+				translateX.value = withTiming(
+					-deviceWidth * 2,
+					{ duration: 300 },
+					(isFinished) => {
+						if (isFinished) {
+							// runOnJS(addMonth)();
+						}
+					},
+				);
+			} else {
+				translateX.value = withTiming(-deviceWidth, { duration: 300 });
+			}
+		});
 
-		for (let i = 1; i <= startOfMonth.get("day"); i++) {
-			columns.unshift(dayjs(startOfMonth).subtract(i, "day"));
-		}
+	const verticalPanGesture = Gesture.Pan()
+		.activeOffsetY([-20, 20])
+		.onUpdate((event) => {
+			console.log(event.translationY);
+		})
+		.onEnd((event) => {
+			console.log(event.translationY);
+		});
 
-		for (let i = 0; i < endOfMonth.get("date"); i++) {
-			columns.push(dayjs(startOfMonth).add(i, "day"));
-		}
-
-		const diff = 6 - endOfMonth.get("day");
-		for (let i = 1; i <= diff; i++) {
-			columns.push(dayjs(endOfMonth).add(i, "day"));
-		}
-
-		return columns;
-	}, [selectedMonth]);
+	const animatedStyle = useAnimatedStyle(() => ({
+		transform: [{ translateX: translateX.value }],
+		height: height.value,
+	}));
 
 	const handlePreviousMonth = () => {
-		setSelectedMonth(dayjs(selectedMonth).subtract(1, "month"));
+		setDisplayMonth(dayjs(displayMonth).subtract(1, "month"));
 	};
 
 	const handleNextMonth = () => {
-		setSelectedMonth(dayjs(selectedMonth).add(1, "month"));
+		setDisplayMonth(dayjs(displayMonth).add(1, "month"));
+	};
+
+	const handleChangeDate = (date: Date) => {
+		if (dayjs(date).isSame(selectedDate, "month")) {
+			setSelectedDate(dayjs(date));
+		} else {
+			setDisplayMonth(dayjs(date).startOf("month"));
+			setSelectedDate(dayjs(date));
+		}
 	};
 
 	useEffect(() => {
@@ -111,7 +113,7 @@ export const Calendar = ({
 				<TouchableOpacity onPress={handlePreviousMonth}>
 					<Icon name="left" size={24} color="black" />
 				</TouchableOpacity>
-				<Text>{dayjs(selectedMonth).format("MMMM YYYY")}</Text>
+				<Text>{dayjs(displayMonth).format("MMMM YYYY")}</Text>
 				<TouchableOpacity onPress={handleNextMonth}>
 					<Icon name="right" size={24} color="black" />
 				</TouchableOpacity>
@@ -125,27 +127,39 @@ export const Calendar = ({
 				<Text style={{ color: "gray" }}>Fri</Text>
 				<Text style={{ color: "blue" }}>Sat</Text>
 			</View>
-			<View>
-				<FlatList
-					data={columns}
-					numColumns={7}
-					renderItem={({ item }) =>
-						rednerItem({
-							item,
-							isCurrentMonth: !!item?.isSame(selectedMonth, "month"),
-							isSelected:
-								item?.format("YYYY-MM-DD") ===
-									selectedDate.format("YYYY-MM-DD") &&
-								!!item?.isSame(selectedMonth, "month"),
-							onPress: () => {
-								if (item) {
-									setSelectedMonth(dayjs(item).startOf("month"));
-									setSelectedDate(item);
-								}
+			<View style={{ overflow: "hidden" }}>
+				<GestureDetector
+					gesture={Gesture.Race(horizontalPanGesture, verticalPanGesture)}
+				>
+					<Animated.View
+						onLayout={(event) => {
+							console.log(event.nativeEvent.layout.height);
+						}}
+						style={[
+							animatedStyle,
+							{
+								flexDirection: "row",
+								width: "300%",
 							},
-						})
-					}
-				/>
+						]}
+					>
+						<CalendarBody
+							month={displayMonth.subtract(1, "month")}
+							selectedDate={selectedDate}
+							onDateSelect={handleChangeDate}
+						/>
+						<CalendarBody
+							month={displayMonth}
+							selectedDate={selectedDate}
+							onDateSelect={handleChangeDate}
+						/>
+						<CalendarBody
+							month={displayMonth.add(1, "month")}
+							selectedDate={selectedDate}
+							onDateSelect={handleChangeDate}
+						/>
+					</Animated.View>
+				</GestureDetector>
 			</View>
 		</View>
 	);
