@@ -78,7 +78,7 @@ export const Calendar = ({
 		const columns: (dayjs.Dayjs | null)[] = [];
 
 		for (let i = 1; i <= startOfMonth.get("day"); i++) {
-			columns.push(dayjs(startOfMonth).subtract(i, "day"));
+			columns.unshift(dayjs(startOfMonth).subtract(i, "day"));
 		}
 
 		for (let i = 0; i < endOfMonth.get("date"); i++) {
@@ -139,6 +139,7 @@ export const Calendar = ({
 								!!item?.isSame(selectedMonth, "month"),
 							onPress: () => {
 								if (item) {
+									setSelectedMonth(dayjs(item).startOf("month"));
 									setSelectedDate(item);
 								}
 							},
