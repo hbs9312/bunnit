@@ -27,8 +27,11 @@ export const Calendar = ({
 	onChange?: (date: Date) => void;
 }) => {
 	const translateX = useSharedValue(-deviceWidth);
-	const height = useSharedValue<number | null>(null);
+	const height = useSharedValue<number | null>((deviceWidth / 7) * 6);
 	const [mode, setMode] = useState<"month" | "week">("month");
+	const [isAnimating, setIsAnimating] = useState(false);
+
+	const prevHeight = useSharedValue(50 * 6);
 	const [displayMonth, setDisplayMonth] = useState<dayjs.Dayjs>(
 		dayjs(initialDate),
 	);
@@ -38,23 +41,25 @@ export const Calendar = ({
 
 	const subtractMonth = () => {
 		setDisplayMonth(dayjs(displayMonth).subtract(1, "month"));
-		translateX.value = -deviceWidth;
 	};
 
 	const addMonth = () => {
 		setDisplayMonth(dayjs(displayMonth).add(1, "month"));
-		translateX.value = -deviceWidth;
 	};
 	const horizontalPanGesture = Gesture.Pan()
-		.activeOffsetX([-50, 50])
+		.activeOffsetX([-2, 2])
+		.onStart(() => {
+			runOnJS(setIsAnimating)(true);
+		})
 		.onUpdate((event) => {
 			translateX.value = event.translationX - deviceWidth;
 		})
 		.onEnd((event) => {
 			if (event.translationX > deviceWidth * 0.3) {
 				translateX.value = withTiming(0, { duration: 300 }, (isFinished) => {
+					runOnJS(subtractMonth)();
 					if (isFinished) {
-						// runOnJS(subtractMonth)();
+						runOnJS(setIsAnimating)(false);
 					}
 				});
 			} else if (event.translationX < -deviceWidth * 0.3) {
@@ -62,29 +67,78 @@ export const Calendar = ({
 					-deviceWidth * 2,
 					{ duration: 300 },
 					(isFinished) => {
+						runOnJS(addMonth)();
 						if (isFinished) {
-							// runOnJS(addMonth)();
+							runOnJS(setIsAnimating)(false);
 						}
 					},
 				);
 			} else {
-				translateX.value = withTiming(-deviceWidth, { duration: 300 });
+				translateX.value = withTiming(
+					-deviceWidth,
+					{ duration: 300 },
+					(isFinished) => {
+						if (isFinished) {
+							runOnJS(setIsAnimating)(false);
+						}
+					},
+				);
 			}
 		});
 
+	const verticalStyle = useAnimatedStyle(() => {
+		return {
+			height: height.value,
+		};
+	});
+
 	const verticalPanGesture = Gesture.Pan()
-		.activeOffsetY([-20, 20])
+		.activeOffsetY([-10, 10])
+		.hitSlop({ height: 50, bottom: 0 })
+		.onStart(() => {
+			// runOnJS(setIsAnimating)(true);
+		})
 		.onUpdate((event) => {
-			console.log(event.translationY);
+			height.value = prevHeight.value + event.translationY;
 		})
 		.onEnd((event) => {
-			console.log(event.translationY);
+			if (event.translationY < 50) {
+				prevHeight.value = deviceWidth / 7;
+				height.value = withTiming(50, { duration: 300 }, (isFinished) => {
+					if (isFinished) {
+						runOnJS(setIsAnimating)(false);
+					}
+				});
+			} else if (event.translationY > -50) {
+				prevHeight.value = (deviceWidth / 7) * 6;
+				height.value = withTiming(
+					(deviceWidth / 7) * 6,
+					{ duration: 300 },
+					(isFinished) => {
+						if (isFinished) {
+							runOnJS(setIsAnimating)(false);
+						}
+					},
+				);
+			} else {
+				height.value = withTiming(
+					prevHeight.value,
+					{ duration: 300 },
+					(isFinished) => {
+						if (isFinished) {
+							runOnJS(setIsAnimating)(false);
+						}
+					},
+				);
+			}
 		});
 
-	const animatedStyle = useAnimatedStyle(() => ({
-		transform: [{ translateX: translateX.value }],
-		height: height.value,
-	}));
+	const translateStyle = useAnimatedStyle(() => {
+		return {
+			transform: [{ translateX: translateX.value }],
+			height: height.value,
+		};
+	});
 
 	const handlePreviousMonth = () => {
 		setDisplayMonth(dayjs(displayMonth).subtract(1, "month"));
@@ -107,6 +161,10 @@ export const Calendar = ({
 		onChange?.(selectedDate.toDate());
 	}, [selectedDate, onChange]);
 
+	// useEffect(() => {
+	// 	translateX.value = withTiming(-deviceWidth, { duration: 0 });
+	// }, [displayMonth]);
+
 	return (
 		<View style={{ flex: 1 }}>
 			<View style={styles.header}>
@@ -128,37 +186,58 @@ export const Calendar = ({
 				<Text style={{ color: "blue" }}>Sat</Text>
 			</View>
 			<View style={{ overflow: "hidden" }}>
+				<Text>{isAnimating ? "Animating" : "Not animating"}</Text>
 				<GestureDetector
 					gesture={Gesture.Race(horizontalPanGesture, verticalPanGesture)}
 				>
-					<Animated.View
-						onLayout={(event) => {
-							console.log(event.nativeEvent.layout.height);
-						}}
-						style={[
-							animatedStyle,
-							{
-								flexDirection: "row",
-								width: "300%",
-							},
-						]}
-					>
-						<CalendarBody
-							month={displayMonth.subtract(1, "month")}
-							selectedDate={selectedDate}
-							onDateSelect={handleChangeDate}
-						/>
-						<CalendarBody
-							month={displayMonth}
-							selectedDate={selectedDate}
-							onDateSelect={handleChangeDate}
-						/>
-						<CalendarBody
-							month={displayMonth.add(1, "month")}
-							selectedDate={selectedDate}
-							onDateSelect={handleChangeDate}
-						/>
-					</Animated.View>
+					<View style={{ flexDirection: "column-reverse" }}>
+						<Animated.View
+							style={[
+								translateStyle,
+								{
+									width: "300%",
+									flexDirection: "row",
+									overflow: "hidden",
+									borderBottomWidth: 1,
+									borderColor: "#E0E0E0",
+									display: isAnimating ? "flex" : "none",
+								},
+							]}
+						>
+							<CalendarBody
+								month={displayMonth.subtract(1, "month")}
+								selectedDate={selectedDate}
+								onDateSelect={handleChangeDate}
+							/>
+							<CalendarBody
+								month={displayMonth}
+								selectedDate={selectedDate}
+								onDateSelect={handleChangeDate}
+							/>
+							<CalendarBody
+								month={displayMonth.add(1, "month")}
+								selectedDate={selectedDate}
+								onDateSelect={handleChangeDate}
+							/>
+						</Animated.View>
+
+						<Animated.View
+							style={[
+								verticalStyle,
+								{
+									display: isAnimating ? "none" : "flex",
+									borderBottomWidth: 1,
+									borderColor: "#E0E0E0",
+								},
+							]}
+						>
+							<CalendarBody
+								month={displayMonth}
+								selectedDate={selectedDate}
+								onDateSelect={handleChangeDate}
+							/>
+						</Animated.View>
+					</View>
 				</GestureDetector>
 			</View>
 		</View>

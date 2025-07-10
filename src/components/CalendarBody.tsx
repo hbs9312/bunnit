@@ -83,8 +83,10 @@ export const CalendarBody = ({
 			days.push(startOfMonth.add(i, "day"));
 		}
 
+		const remaining = 42 - days.length;
+
 		// 다음 달의 날짜들 추가 (6주 표시를 위해)
-		for (let i = 1; i <= 6 - endOfMonth.day(); i++) {
+		for (let i = 1; i <= remaining; i++) {
 			days.push(endOfMonth.add(i, "day"));
 		}
 
