@@ -1,4 +1,4 @@
-import type dayjs from "dayjs";
+import dayjs from "dayjs";
 import { useMemo } from "react";
 import {
 	Dimensions,
@@ -12,8 +12,9 @@ import {
 const deviceWidth = Dimensions.get("window").width;
 
 interface CalendarBodyProps {
-	month: dayjs.Dayjs;
+	date: Date;
 	selectedDate: dayjs.Dayjs;
+	unit: "month" | "week";
 	onDateSelect: (date: Date) => void;
 }
 
@@ -62,13 +63,14 @@ const DayItem = ({
 };
 
 export const CalendarBody = ({
-	month,
+	date,
 	selectedDate,
+	unit,
 	onDateSelect,
 }: CalendarBodyProps) => {
 	const calendarDays = useMemo(() => {
-		const startOfMonth = month.startOf("month");
-		const endOfMonth = month.endOf("month");
+		const startOfMonth = dayjs(date).startOf(unit);
+		const endOfMonth = dayjs(date).endOf(unit);
 		const startDayOfWeek = startOfMonth.day();
 
 		const days: (dayjs.Dayjs | null)[] = [];
@@ -78,20 +80,22 @@ export const CalendarBody = ({
 			days.push(startOfMonth.subtract(i + 1, "day"));
 		}
 
+		const end = unit === "month" ? endOfMonth.date() : 7;
 		// 현재 달의 날짜들 추가
-		for (let i = 0; i < endOfMonth.date(); i++) {
+		for (let i = 0; i < end; i++) {
 			days.push(startOfMonth.add(i, "day"));
 		}
 
-		const remaining = 42 - days.length;
+		if (unit === "month") {
+			const remaining = 42 - days.length;
 
-		// 다음 달의 날짜들 추가 (6주 표시를 위해)
-		for (let i = 1; i <= remaining; i++) {
-			days.push(endOfMonth.add(i, "day"));
+			// 다음 달의 날짜들 추가 (6주 표시를 위해)
+			for (let i = 1; i <= remaining; i++) {
+				days.push(endOfMonth.add(i, "day"));
+			}
 		}
-
 		return days;
-	}, [month]);
+	}, [date, unit]);
 
 	const handleDayPress = (date: Date) => {
 		onDateSelect(date);
@@ -100,7 +104,7 @@ export const CalendarBody = ({
 	const renderDayItem = ({ item }: { item: dayjs.Dayjs | null }) => {
 		if (!item) return <View style={styles.dayContainer} />;
 
-		const isCurrentMonth = item.isSame(month, "month");
+		const isCurrentMonth = item.isSame(date, unit);
 		const isSelected = item.isSame(selectedDate, "day");
 
 		return (

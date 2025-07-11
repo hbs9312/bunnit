@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
 	Dimensions,
 	StyleSheet,
@@ -33,23 +33,36 @@ export const Calendar = ({
 	const [mode, setMode] = useState<"month" | "week">("month");
 	const [isAnimating, setIsAnimating] = useState(false);
 
-	const prevHeight = useSharedValue(50 * 6);
+	const prevHeight = useSharedValue((deviceWidth / 7) * 6);
+
 	const [displayMonth, setDisplayMonth] = useState<dayjs.Dayjs>(
-		dayjs(initialDate),
+		dayjs(initialDate).set("date", 1),
 	);
-	const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs>(
-		dayjs(displayMonth),
-	);
+	const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs>(dayjs());
+
+	const weekNumber = useMemo(() => {
+		const startOfWeek = displayMonth.set("date", 1).day();
+
+		return Math.ceil((startOfWeek + displayMonth.date()) / 7);
+	}, [displayMonth]);
+
+	const selectedLine = useMemo(() => {
+		if (!dayjs(selectedDate).isSame(displayMonth, "month")) {
+			return null;
+		}
+		const startOfWeek = selectedDate.set("date", 1).day();
+		return Math.ceil((startOfWeek + selectedDate.date()) / 7);
+	}, [selectedDate, displayMonth]);
 
 	const subtractMonth = () => {
-		setDisplayMonth(dayjs(displayMonth).subtract(1, "month"));
+		setDisplayMonth(dayjs(displayMonth).subtract(1, mode));
 	};
 
 	const addMonth = () => {
-		setDisplayMonth(dayjs(displayMonth).add(1, "month"));
+		setDisplayMonth(dayjs(displayMonth).add(1, mode));
 	};
 	const horizontalPanGesture = Gesture.Pan()
-		.activeOffsetX([-2, 2])
+		.activeOffsetX([-5, 5])
 		.onStart(() => {
 			runOnJS(setIsAnimating)(true);
 		})
@@ -70,6 +83,7 @@ export const Calendar = ({
 					{ duration: 300 },
 					(isFinished) => {
 						runOnJS(addMonth)();
+
 						if (isFinished) {
 							runOnJS(setIsAnimating)(false);
 						}
@@ -96,20 +110,28 @@ export const Calendar = ({
 
 	const verticalPanGesture = Gesture.Pan()
 		.activeOffsetY([-10, 10])
-		.hitSlop({ height: 50, bottom: 0 })
-		.onStart(() => {
-			// runOnJS(setIsAnimating)(true);
-		})
 		.onUpdate((event) => {
 			height.value = prevHeight.value + event.translationY;
+			console.log(weekNumber);
+
 			translateY.value =
-				(mode === "week" ? -prevHeight.value : 0) +
-				((deviceWidth / 7) * event.translationY) / ((deviceWidth / 7) * 4);
+				(mode === "week"
+					? -prevHeight.value * ((selectedLine ?? weekNumber) - 1)
+					: 0) +
+				((deviceWidth / 7) *
+					event.translationY *
+					((selectedLine ?? weekNumber) - 1)) /
+					((deviceWidth / 7) * 5);
 		})
 		.onEnd((event) => {
 			if (event.translationY < 50) {
 				prevHeight.value = deviceWidth / 7;
-				translateY.value = withTiming(-50, { duration: 300 });
+				translateY.value = withTiming(
+					(-deviceWidth / 7) * ((selectedLine ?? weekNumber) - 1),
+					{
+						duration: 300,
+					},
+				);
 				height.value = withTiming(
 					deviceWidth / 7,
 					{ duration: 300 },
@@ -180,7 +202,6 @@ export const Calendar = ({
 		};
 	});
 
-	console.log(mode);
 	return (
 		<View style={{ flex: 1 }}>
 			<View style={styles.header}>
@@ -224,23 +245,26 @@ export const Calendar = ({
 										borderBottomWidth: 1,
 										borderColor: "#E0E0E0",
 									},
-									testTranslateStyle,
+									// testTranslateStyle,
 								]}
 							>
 								<CalendarBody
-									month={displayMonth.subtract(1, "month")}
+									date={displayMonth.subtract(1, "month").toDate()}
 									selectedDate={selectedDate}
 									onDateSelect={handleChangeDate}
+									unit={mode}
 								/>
 								<CalendarBody
-									month={displayMonth}
+									date={displayMonth.toDate()}
 									selectedDate={selectedDate}
 									onDateSelect={handleChangeDate}
+									unit={mode}
 								/>
 								<CalendarBody
-									month={displayMonth.add(1, "month")}
+									date={displayMonth.add(1, "month").toDate()}
 									selectedDate={selectedDate}
 									onDateSelect={handleChangeDate}
+									unit={mode}
 								/>
 							</Animated.View>
 						</Animated.View>
@@ -259,9 +283,10 @@ export const Calendar = ({
 								style={[testTranslateStyle, { height: (deviceWidth / 7) * 6 }]}
 							>
 								<CalendarBody
-									month={displayMonth}
+									date={displayMonth.toDate()}
 									selectedDate={selectedDate}
 									onDateSelect={handleChangeDate}
+									unit="month"
 								/>
 							</Animated.View>
 						</Animated.View>
