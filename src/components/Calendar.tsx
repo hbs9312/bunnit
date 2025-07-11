@@ -28,39 +28,35 @@ export const Calendar = ({
 }) => {
 	const translateX = useSharedValue(-deviceWidth);
 	const height = useSharedValue((deviceWidth / 7) * 6);
-
 	const translateY = useSharedValue(0);
+	const prevHeight = useSharedValue((deviceWidth / 7) * 6);
+
 	const [mode, setMode] = useState<"month" | "week">("month");
 	const [isAnimating, setIsAnimating] = useState(false);
 
-	const prevHeight = useSharedValue((deviceWidth / 7) * 6);
-
-	const [displayMonth, setDisplayMonth] = useState<dayjs.Dayjs>(
+	const [displayDate, setDisplayDate] = useState<dayjs.Dayjs>(
 		dayjs(initialDate).set("date", 1),
 	);
 	const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs>(dayjs());
 
-	const weekNumber = useMemo(() => {
-		const startOfWeek = displayMonth.set("date", 1).day();
+	const { weekNumber, selectedLine } = useMemo(() => {
+		const startOfWeek = displayDate.set("date", 1).day();
 
-		return Math.ceil((startOfWeek + displayMonth.date()) / 7);
-	}, [displayMonth]);
+		const weekNumber = Math.ceil((startOfWeek + displayDate.date()) / 7);
+		const selectedLine = dayjs(selectedDate).isSame(displayDate, "month")
+			? Math.ceil((startOfWeek + selectedDate.date()) / 7)
+			: null;
+		return { weekNumber, selectedLine };
+	}, [displayDate, selectedDate]);
 
-	const selectedLine = useMemo(() => {
-		if (!dayjs(selectedDate).isSame(displayMonth, "month")) {
-			return null;
-		}
-		const startOfWeek = selectedDate.set("date", 1).day();
-		return Math.ceil((startOfWeek + selectedDate.date()) / 7);
-	}, [selectedDate, displayMonth]);
-
-	const subtractMonth = () => {
-		setDisplayMonth(dayjs(displayMonth).subtract(1, mode));
+	const subtractDate = () => {
+		setDisplayDate(dayjs(displayDate).subtract(1, mode));
 	};
 
-	const addMonth = () => {
-		setDisplayMonth(dayjs(displayMonth).add(1, mode));
+	const addDate = () => {
+		setDisplayDate(dayjs(displayDate).add(1, mode));
 	};
+
 	const horizontalPanGesture = Gesture.Pan()
 		.activeOffsetX([-5, 5])
 		.onStart(() => {
@@ -72,7 +68,7 @@ export const Calendar = ({
 		.onEnd((event) => {
 			if (event.translationX > deviceWidth * 0.3) {
 				translateX.value = withTiming(0, { duration: 300 }, (isFinished) => {
-					runOnJS(subtractMonth)();
+					runOnJS(subtractDate)();
 					if (isFinished) {
 						runOnJS(setIsAnimating)(false);
 					}
@@ -82,8 +78,7 @@ export const Calendar = ({
 					-deviceWidth * 2,
 					{ duration: 300 },
 					(isFinished) => {
-						runOnJS(addMonth)();
-
+						runOnJS(addDate)();
 						if (isFinished) {
 							runOnJS(setIsAnimating)(false);
 						}
@@ -112,8 +107,6 @@ export const Calendar = ({
 		.activeOffsetY([-10, 10])
 		.onUpdate((event) => {
 			height.value = prevHeight.value + event.translationY;
-			console.log(weekNumber);
-
 			translateY.value =
 				(mode === "week"
 					? -prevHeight.value * ((selectedLine ?? weekNumber) - 1)
@@ -176,31 +169,31 @@ export const Calendar = ({
 	});
 
 	const handlePreviousMonth = () => {
-		setDisplayMonth(dayjs(displayMonth).subtract(1, "month"));
+		setDisplayDate(dayjs(displayDate).subtract(1, mode));
 	};
 
 	const handleNextMonth = () => {
-		setDisplayMonth(dayjs(displayMonth).add(1, "month"));
+		setDisplayDate(dayjs(displayDate).add(1, mode));
 	};
 
 	const handleChangeDate = (date: Date) => {
 		if (dayjs(date).isSame(selectedDate, "month")) {
 			setSelectedDate(dayjs(date));
 		} else {
-			setDisplayMonth(dayjs(date).startOf("month"));
+			setDisplayDate(dayjs(date).startOf("month"));
 			setSelectedDate(dayjs(date));
 		}
 	};
 
-	useEffect(() => {
-		onChange?.(selectedDate.toDate());
-	}, [selectedDate, onChange]);
-
-	const testTranslateStyle = useAnimatedStyle(() => {
+	const translateYStyle = useAnimatedStyle(() => {
 		return {
 			transform: [{ translateY: translateY.value }],
 		};
 	});
+
+	useEffect(() => {
+		onChange?.(selectedDate.toDate());
+	}, [selectedDate, onChange]);
 
 	return (
 		<View style={{ flex: 1 }}>
@@ -208,7 +201,7 @@ export const Calendar = ({
 				<TouchableOpacity onPress={handlePreviousMonth}>
 					<Icon name="left" size={24} color="black" />
 				</TouchableOpacity>
-				<Text>{dayjs(displayMonth).format("MMMM YYYY")}</Text>
+				<Text>{dayjs(displayDate).format("MMMM YYYY")}</Text>
 				<TouchableOpacity onPress={handleNextMonth}>
 					<Icon name="right" size={24} color="black" />
 				</TouchableOpacity>
@@ -249,19 +242,19 @@ export const Calendar = ({
 								]}
 							>
 								<CalendarBody
-									date={displayMonth.subtract(1, "month").toDate()}
+									date={displayDate.subtract(1, mode).toDate()}
 									selectedDate={selectedDate}
 									onDateSelect={handleChangeDate}
 									unit={mode}
 								/>
 								<CalendarBody
-									date={displayMonth.toDate()}
+									date={displayDate.toDate()}
 									selectedDate={selectedDate}
 									onDateSelect={handleChangeDate}
 									unit={mode}
 								/>
 								<CalendarBody
-									date={displayMonth.add(1, "month").toDate()}
+									date={displayDate.add(1, mode).toDate()}
 									selectedDate={selectedDate}
 									onDateSelect={handleChangeDate}
 									unit={mode}
@@ -280,10 +273,10 @@ export const Calendar = ({
 							]}
 						>
 							<Animated.View
-								style={[testTranslateStyle, { height: (deviceWidth / 7) * 6 }]}
+								style={[translateYStyle, { height: (deviceWidth / 7) * 6 }]}
 							>
 								<CalendarBody
-									date={displayMonth.toDate()}
+									date={displayDate.toDate()}
 									selectedDate={selectedDate}
 									onDateSelect={handleChangeDate}
 									unit="month"

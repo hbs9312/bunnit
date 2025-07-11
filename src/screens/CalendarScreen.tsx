@@ -6,7 +6,7 @@ export default function CalendarScreen() {
 		<View style={{ flex: 1 }}>
 			<Calendar
 				initialDate={new Date()}
-				onChange={(date) => console.log(date)}
+				// onChange={(date) => console.log(date)}
 			/>
 		</View>
 	);

@@ -104,13 +104,13 @@ export const CalendarBody = ({
 	const renderDayItem = ({ item }: { item: dayjs.Dayjs | null }) => {
 		if (!item) return <View style={styles.dayContainer} />;
 
-		const isCurrentMonth = item.isSame(date, unit);
-		const isSelected = item.isSame(selectedDate, "day");
+		const isCurrent = item.isSame(date, "month");
+		const isSelected = item.isSame(selectedDate, "day") && isCurrent;
 
 		return (
 			<DayItem
 				item={item}
-				isCurrentMonth={isCurrentMonth}
+				isCurrentMonth={isCurrent}
 				isSelected={isSelected}
 				onPress={() => handleDayPress(item.toDate())}
 			/>
