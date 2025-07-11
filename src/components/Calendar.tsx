@@ -27,7 +27,9 @@ export const Calendar = ({
 	onChange?: (date: Date) => void;
 }) => {
 	const translateX = useSharedValue(-deviceWidth);
-	const height = useSharedValue<number | null>((deviceWidth / 7) * 6);
+	const height = useSharedValue((deviceWidth / 7) * 6);
+
+	const translateY = useSharedValue(0);
 	const [mode, setMode] = useState<"month" | "week">("month");
 	const [isAnimating, setIsAnimating] = useState(false);
 
@@ -100,22 +102,33 @@ export const Calendar = ({
 		})
 		.onUpdate((event) => {
 			height.value = prevHeight.value + event.translationY;
+			translateY.value =
+				(mode === "week" ? -prevHeight.value : 0) +
+				((deviceWidth / 7) * event.translationY) / ((deviceWidth / 7) * 4);
 		})
 		.onEnd((event) => {
 			if (event.translationY < 50) {
 				prevHeight.value = deviceWidth / 7;
-				height.value = withTiming(50, { duration: 300 }, (isFinished) => {
-					if (isFinished) {
-						runOnJS(setIsAnimating)(false);
-					}
-				});
+				translateY.value = withTiming(-50, { duration: 300 });
+				height.value = withTiming(
+					deviceWidth / 7,
+					{ duration: 300 },
+					(isFinished) => {
+						if (isFinished) {
+							runOnJS(setIsAnimating)(false);
+							runOnJS(setMode)("week");
+						}
+					},
+				);
 			} else if (event.translationY > -50) {
 				prevHeight.value = (deviceWidth / 7) * 6;
+				translateY.value = withTiming(0, { duration: 300 });
 				height.value = withTiming(
 					(deviceWidth / 7) * 6,
 					{ duration: 300 },
 					(isFinished) => {
 						if (isFinished) {
+							runOnJS(setMode)("month");
 							runOnJS(setIsAnimating)(false);
 						}
 					},
@@ -161,10 +174,13 @@ export const Calendar = ({
 		onChange?.(selectedDate.toDate());
 	}, [selectedDate, onChange]);
 
-	// useEffect(() => {
-	// 	translateX.value = withTiming(-deviceWidth, { duration: 0 });
-	// }, [displayMonth]);
+	const testTranslateStyle = useAnimatedStyle(() => {
+		return {
+			transform: [{ translateY: translateY.value }],
+		};
+	});
 
+	console.log(mode);
 	return (
 		<View style={{ flex: 1 }}>
 			<View style={styles.header}>
@@ -186,7 +202,7 @@ export const Calendar = ({
 				<Text style={{ color: "blue" }}>Sat</Text>
 			</View>
 			<View style={{ overflow: "hidden" }}>
-				<Text>{isAnimating ? "Animating" : "Not animating"}</Text>
+				{/* <Text>{isAnimating ? "Animating" : "Not animating"}</Text> */}
 				<GestureDetector
 					gesture={Gesture.Race(horizontalPanGesture, verticalPanGesture)}
 				>
@@ -195,30 +211,38 @@ export const Calendar = ({
 							style={[
 								translateStyle,
 								{
-									width: "300%",
-									flexDirection: "row",
-									overflow: "hidden",
-									borderBottomWidth: 1,
-									borderColor: "#E0E0E0",
 									display: isAnimating ? "flex" : "none",
 								},
 							]}
 						>
-							<CalendarBody
-								month={displayMonth.subtract(1, "month")}
-								selectedDate={selectedDate}
-								onDateSelect={handleChangeDate}
-							/>
-							<CalendarBody
-								month={displayMonth}
-								selectedDate={selectedDate}
-								onDateSelect={handleChangeDate}
-							/>
-							<CalendarBody
-								month={displayMonth.add(1, "month")}
-								selectedDate={selectedDate}
-								onDateSelect={handleChangeDate}
-							/>
+							<Animated.View
+								style={[
+									{
+										width: "300%",
+										flexDirection: "row",
+										overflow: "hidden",
+										borderBottomWidth: 1,
+										borderColor: "#E0E0E0",
+									},
+									testTranslateStyle,
+								]}
+							>
+								<CalendarBody
+									month={displayMonth.subtract(1, "month")}
+									selectedDate={selectedDate}
+									onDateSelect={handleChangeDate}
+								/>
+								<CalendarBody
+									month={displayMonth}
+									selectedDate={selectedDate}
+									onDateSelect={handleChangeDate}
+								/>
+								<CalendarBody
+									month={displayMonth.add(1, "month")}
+									selectedDate={selectedDate}
+									onDateSelect={handleChangeDate}
+								/>
+							</Animated.View>
 						</Animated.View>
 
 						<Animated.View
@@ -231,11 +255,15 @@ export const Calendar = ({
 								},
 							]}
 						>
-							<CalendarBody
-								month={displayMonth}
-								selectedDate={selectedDate}
-								onDateSelect={handleChangeDate}
-							/>
+							<Animated.View
+								style={[testTranslateStyle, { height: (deviceWidth / 7) * 6 }]}
+							>
+								<CalendarBody
+									month={displayMonth}
+									selectedDate={selectedDate}
+									onDateSelect={handleChangeDate}
+								/>
+							</Animated.View>
 						</Animated.View>
 					</View>
 				</GestureDetector>
